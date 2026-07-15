@@ -44,6 +44,36 @@ class Test_Activitypub extends \WP_UnitTestCase {
 	}
 
 	/**
+	 * Test verified Inbox handoff response semantics.
+	 *
+	 * @covers \Activitypub\handle_verified_inbox
+	 */
+	public function test_verified_inbox_handoff_semantics() {
+		$request = new \WP_REST_Request( 'POST', '/activitypub/1.0/inbox' );
+		$payload = array(
+			'id'     => 'https://remote.example/activities/1',
+			'type'   => 'Follow',
+			'actor'  => 'https://remote.example/users/alice',
+			'object' => 'https://local.example/users/bob',
+		);
+
+		$this->assertNull( \Activitypub\handle_verified_inbox( $payload, $request, 'shared_inbox' ) );
+
+		\add_filter( 'activitypub_pre_handle_verified_inbox', '__return_true' );
+		$response = \Activitypub\handle_verified_inbox( $payload, $request, 'shared_inbox' );
+		$this->assertInstanceOf( \WP_REST_Response::class, $response );
+		$this->assertSame( 202, $response->get_status() );
+		\remove_filter( 'activitypub_pre_handle_verified_inbox', '__return_true' );
+
+		$invalid = static function () {
+			return false;
+		};
+		\add_filter( 'activitypub_pre_handle_verified_inbox', $invalid );
+		$this->assertWPError( \Activitypub\handle_verified_inbox( $payload, $request, 'shared_inbox' ) );
+		\remove_filter( 'activitypub_pre_handle_verified_inbox', $invalid );
+	}
+
+	/**
 	 * Test environment.
 	 */
 	public function test_test_env() {

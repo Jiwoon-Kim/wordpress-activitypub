@@ -307,7 +307,11 @@ class Actors_Inbox_Controller extends Actors_Controller {
 			return $shared_inbox->create_item( $request );
 		}
 
-		$data = $request->get_json_params();
+		$data    = $request->get_json_params();
+		$handled = \Activitypub\handle_verified_inbox( $data, $request, Inbox::CONTEXT_INBOX, array( (int) $user_id ) );
+		if ( null !== $handled ) {
+			return $handled;
+		}
 		$type = camel_to_snake_case( $request->get_param( 'type' ) );
 
 		/* @var Activity $activity Activity object.*/

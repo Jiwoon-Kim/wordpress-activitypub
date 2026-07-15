@@ -148,7 +148,11 @@ class Inbox_Controller extends \WP_REST_Controller {
 	 * @return \WP_REST_Response|\WP_Error Response object or WP_Error.
 	 */
 	public function create_item( $request ) {
-		$data = $request->get_json_params();
+		$data    = $request->get_json_params();
+		$handled = \Activitypub\handle_verified_inbox( $data, $request, Inbox::CONTEXT_SHARED_INBOX );
+		if ( null !== $handled ) {
+			return $handled;
+		}
 		$type = camel_to_snake_case( $request->get_param( 'type' ) );
 
 		/* @var Activity $activity Activity object.*/

@@ -1,0 +1,4 @@
+Significance: minor
+Type: added
+
+Add a verified Inbox handoff that can suppress default domain handlers and persistence.

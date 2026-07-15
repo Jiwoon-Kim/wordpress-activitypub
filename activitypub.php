@@ -66,6 +66,66 @@ function is_module_enabled( $module ) {
 }
 
 /**
+ * Offer a signature-verified Inbox Activity to an external domain owner.
+ *
+ * This helper is called only from Inbox route callbacks, after their permission
+ * callbacks have verified the HTTP signature and before moderation, handlers, or
+ * default Inbox persistence runs.
+ *
+ * @param array            $activity           Raw Activity payload.
+ * @param \WP_REST_Request $request            Verified REST request.
+ * @param string           $context            Inbox context.
+ * @param int[]            $recipient_user_ids Route-resolved WordPress recipients, if known.
+ * @return null|\WP_REST_Response|\WP_Error Null continues default handling.
+ */
+function handle_verified_inbox( $activity, $request, $context, $recipient_user_ids = array() ) {
+	/**
+	 * Filters whether an external domain owner claims a verified Inbox Activity.
+	 *
+	 * Return `null` to continue default handlers and persistence, `true` to return
+	 * the standard 202 response, or a WP_REST_Response/WP_Error to respond explicitly.
+	 *
+	 * @param null|true|\WP_REST_Response|\WP_Error $handled            Claim result. Default null.
+	 * @param array                                  $activity           Raw Activity payload.
+	 * @param \WP_REST_Request                       $request            Verified request.
+	 * @param string                                 $context            inbox|shared_inbox.
+	 * @param int[]                                  $recipient_user_ids Route recipients, if known.
+	 */
+	$handled = \apply_filters(
+		'activitypub_pre_handle_verified_inbox',
+		null,
+		$activity,
+		$request,
+		$context,
+		\array_values( \array_unique( \array_map( 'intval', (array) $recipient_user_ids ) ) )
+	);
+
+	if ( null === $handled || \is_wp_error( $handled ) || $handled instanceof \WP_REST_Response ) {
+		return $handled;
+	}
+	if ( true !== $handled ) {
+		return new \WP_Error(
+			'activitypub_invalid_verified_inbox_handoff',
+			\__( 'The verified Inbox handoff returned an invalid response.', 'activitypub' ),
+			array( 'status' => 500 )
+		);
+	}
+
+	$response = \rest_ensure_response(
+		array(
+			'type'   => 'https://w3id.org/fep/c180#approval-required',
+			'title'  => 'Approval Required',
+			'status' => '202',
+			'detail' => 'This activity requires approval before it can be processed.',
+		)
+	);
+	$response->set_status( 202 );
+	$response->header( 'Content-Type', 'application/activity+json; charset=' . \get_option( 'blog_charset' ) );
+
+	return $response;
+}
+
+/**
  * Initialize REST routes.
  */
 function rest_init() {
